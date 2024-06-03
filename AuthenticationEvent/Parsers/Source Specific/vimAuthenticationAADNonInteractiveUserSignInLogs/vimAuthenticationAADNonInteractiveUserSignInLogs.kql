@@ -1,0 +1,278 @@
+let AADNISigninLogs = (
+    starttime:datetime                  = datetime(null)
+    , endtime:datetime                  = datetime(null)
+    , username_has_any:dynamic          = dynamic([])
+    , targetappname_has_any:dynamic     = dynamic([])
+    , srcipaddr_has_any_prefix:dynamic  = dynamic([])
+    , srchostname_has_any:dynamic       = dynamic([])
+    , eventtype_in:dynamic              = dynamic([])
+    , eventresultdetails_in:dynamic     = dynamic([])
+    , eventresult:string                = "*"
+    , user_type:dynamic                 = dynamic([])
+    , user_id:dynamic                   = dynamic([])
+    , dvc_id:dynamic                    = dynamic([])
+    , dvc_os:dynamic                    = dynamic([])
+    , dvc_type:dynamic                  = dynamic([])
+    , ip:dynamic                        = dynamic([])
+    , useragent:dynamic                 = dynamic([])
+    , eventseverity:dynamic             = dynamic([])
+    , eventproduct:dynamic              = dynamic([])
+    , pivot_lookback:string             = "30"
+    , disabled:bool                     = false
+) {
+    AADNonInteractiveUserSignInLogs
+    | where
+        not(disabled)
+        and (isnull(starttime)  or TimeGenerated >= starttime)
+        and (isnull(endtime)    or TimeGenerated <= endtime)
+    | extend 
+        DeviceDetail        = todynamic(DeviceDetail)
+        , MfaDetail         = todynamic(MfaDetail)
+        , LocationDetails   = todynamic(LocationDetails)
+    | extend
+        DvcId               = tostring(DeviceDetail.deviceId)
+        , DvcHostname       = tostring(DeviceDetail.displayName)
+        , DvcOs             = tostring(DeviceDetail.operatingSystem)
+        , DvcTrustType      = case(
+            tostring(DeviceDetail.trustType) =~ "Azure AD joined", "Entra ID Joined",
+            tostring(DeviceDetail.trustType) =~ "Azure AD registered", "Entra ID Registered",
+            tostring(DeviceDetail.trustType) =~ "Hybrid Azure AD joined", "Hybrid Entra ID Joined",
+            tostring(DeviceDetail.trustType)
+        )
+        , DvcDomain         = iff(tostring(DeviceDetail.trustType) =~ "Azure AD joined", "AzureAD", "")
+    | project-rename
+        DvcIpAddr           = IPAddress
+    | extend
+        SrcDeviceType       = case(
+            isempty(DvcOs), ""
+            , DvcOs has_any ("android", "ios"), "Mobile Device"
+            , "Computer"
+        )
+        , SrcIpAddr         = DvcIpAddr
+        , SrcHostname       = iff(isnotempty(DvcHostname), DvcHostname, DvcIpAddr)
+        , EventProduct      = "Entra ID"
+    | lookup AADResultTypes on ResultType
+    | extend EventSeverity        = case(
+            RiskLevelAggregated   =~ "none"   , "Informational"
+            , RiskLevelAggregated =~ "low"    , "Low"
+            , RiskLevelAggregated =~ "medium" , "Medium"
+            , RiskLevelAggregated =~ "high"   , "High"
+            , RiskLevelAggregated =~ "hidden" , ""
+            , ""
+        )
+    | where 
+        ((array_length(username_has_any)             == 0) or UserPrincipalName has_any(username_has_any))
+        and ((array_length(targetappname_has_any)    == 0) or ResourceDisplayName has_any(targetappname_has_any))
+        and ((array_length(srchostname_has_any)      == 0) or DvcHostname has_any(srchostname_has_any))
+        and ((array_length(srcipaddr_has_any_prefix) == 0) or (has_any_ipv4_prefix(DvcIpAddr, srcipaddr_has_any_prefix)))
+        and ((array_length(eventtype_in)             == 0) or EventType has_any (eventtype_in))
+        and ((array_length(ip)                       == 0) or DvcIpAddr has_any (ip))
+        and ((array_length(user_id)                  == 0) or UserId has_any(user_id))
+        and ((array_length(user_type)                == 0) or UserType has_any(user_type))
+        and ((array_length(dvc_id)                   == 0) or DvcId has_any(dvc_id))
+        and ((array_length(dvc_type)                 == 0) or SrcDeviceType has_any(dvc_type))
+        and ((array_length(dvc_os)                   == 0) or DvcOs has_any(dvc_os))
+        and ((array_length(useragent)                == 0) or UserAgent has_any(useragent))
+        and ((array_length(eventresultdetails_in)    == 0) or (EventResultDetails in~ (eventresultdetails_in))
+        and ((eventresult                          == "*") or (EventResult =~ eventresult)))
+        and ((array_length(eventseverity)            == 0) or EventSeverity has_any (eventseverity))
+        and ((array_length(eventproduct)             == 0) or EventProduct has_any (eventproduct))
+    | extend
+        EventSchema             = "Authentication"
+        , EventSchemaVersion    = "0.1.3"
+        , EventVendor           = "Microsoft"
+        , EventCount            = toint(1)
+        , EventSubType          = "Non-Interactive"
+        , TargetUserIdType      = "EntraID"
+        , TargetUsernameType    = "UPN"
+        , TargetAppType         = "SaaS application"
+        , DvcIdType             = iff(isnotempty(DvcId), "MDEid", "")
+        , EventMessage          = EventOriginalResultDetails
+        , TargetUserId          = UserId
+        , TargetUserScope       = tostring(split(UserPrincipalName, "@", 1)[0])
+        , TargetUserType        = iff(UserType =~ "Member", "Regular", "Guest")
+        , SrcGeoCountry         = tostring(LocationDetails.countryOrRegion)
+        , SrcGeoCity            = tostring(LocationDetails.city)
+        , SrcGeoRegion          = tostring(LocationDetails.state)
+        , SrcGeoLongitude       = toreal(LocationDetails.geoCoordinates.longitude)
+        , SrcGeoLatitude        = toreal(LocationDetails.geoCoordinates.latitude)
+        , SrcRiskLevel          = toint(case(
+            RiskLevelDuringSignIn   =~ "low"   , "33"
+            , RiskLevelDuringSignIn =~ "medium", "66"
+            , RiskLevelDuringSignIn =~ "high"  , "99"
+            , "0"
+        ))
+        , TargetAppId               = ResourceIdentity
+        , TargetAppName             = ResourceDisplayName
+        , TargetHostname            = iff(AppDisplayName == "Windows Sign In", DvcHostname, "")
+        , DvcManaged                = iff(DeviceDetail.isManaged == true, "Yes", "No")
+        , DvcCompliant              = iff(DeviceDetail.isCompliant == true, "Yes", "No")
+        , DvcDomainType             = iff(DvcDomain == "AzureAD", "Windows", "")
+        , DvcFQDN                   = iff(DvcDomain == "AzureAD", strcat("AzureAD\\", DvcHostname), "")
+        , DvcZone                   = tostring(NetworkLocationDetails)
+        , MfaAuthMethod             = tostring(MfaDetail.authMethod)
+        , MfaAuthDetail             = tostring(MfaDetail.authDetail)
+    | project-rename
+        EventUid                    = _ItemId
+        , EventOriginalType         = ResultType
+        , EventOriginalUid          = Id
+        , EventOriginalSeverity     = RiskLevelAggregated
+        , HttpUserAgent             = UserAgent
+        , TargetUsername            = UserPrincipalName
+        , TargetOriginalUserType    = UserType
+        , TargetSessionId           = CorrelationId
+        , SrcOriginalRiskLevel      = RiskLevelDuringSignIn
+        , ActingAppName             = AppDisplayName
+        , ActingAppId               = AppId
+        , TargetUserScopeId         = HomeTenantId
+        , EventProductVersion       = OperationVersion
+    | extend
+        EventStartTime              = TimeGenerated
+        , EventEndTime              = TimeGenerated
+        , EventOriginalSubType      = Type
+        , Dvc                       = DvcHostname
+        , User                      = TargetUsername
+        , Src                       = SrcIpAddr
+        , SrcDvcId                  = DvcId
+        , SrcDvcIdType              = DvcIdType
+        , SrcDomain                 = DvcDomain
+        , SrcFQDN                   = DvcFQDN
+        , SrcDomainType             = DvcDomainType
+        , SrcDvcOs                  = DvcOs
+        , IpAddr                    = SrcIpAddr
+        , UserType                  = TargetUserType
+        , LogonTarget               = iff(isnotempty(TargetHostname), TargetHostname, TargetAppName)
+        , LogonProtocol             = case(
+            AuthenticationProtocol =~ "none"           , "Other"
+            , AuthenticationProtocol =~ "oAuth2"       , "OAuth 2.0"
+            , AuthenticationProtocol =~ "ropc"         , "Resource Owner Password Credential (ROPC)"
+            , AuthenticationProtocol =~ "wsFederation" , "Web Services Federation"
+            , AuthenticationProtocol =~ "saml20"       , "Security Assertion Markup Language 2.0 (SAML 2.0)"
+            , AuthenticationProtocol =~ "deviceCode"   , "OAuth 2.0 Device Authorization Grant"
+            , AuthenticationProtocol
+        )
+        , LogonMethod               = case(
+            AuthenticationRequirement   =~ "multiFactorAuthentication" , "Multi Factor Authentication"
+            , AuthenticationRequirement =~ "singleFactorAuthentication", "Single Factor Authentication"
+            , AuthenticationRequirement
+        )
+        , Dst                       = iff(isnotempty(TargetHostname), TargetHostname, TargetAppName)
+        , AdditionalDetails         = bag_pack(
+            "AuthenticationContextClassReferences", AuthenticationContextClassReferences
+            , "AuthenticationDetails"             , AuthenticationDetails
+            , "AuthenticationProcessingDetails"   , AuthenticationProcessingDetails
+            , "AuthenticationRequirementPolicies" , AuthenticationRequirementPolicies
+            , "ConditionalAccessPolicies"         , ConditionalAccessPolicies
+            , "SessionLifetimePolicies"           , SessionLifetimePolicies
+            , "DeviceDetail"                      , DeviceDetail
+            , "LocationDetails"                   , LocationDetails
+            , "NetworkLocationDetails"            , NetworkLocationDetails
+            , "Status"                            , Status
+            , "ClientAppUsed"                     , ClientAppUsed
+            , "ConditionalAccessStatus"           , ConditionalAccessStatus
+            , "OriginalRequestId"                 , OriginalRequestId
+            , "RiskDetail"                        , RiskDetail
+            , "RiskEventTypes_V2"                 , RiskEventTypes_V2
+            , "RiskState"                         , RiskState
+            , "TokenIssuerType"                   , TokenIssuerType
+            , "ResourceServicePrincipalId"        , ResourceServicePrincipalId
+            , "ResourceTenantId"                  , ResourceTenantId
+            , "UniqueTokenIdentifier"             , UniqueTokenIdentifier
+            , "AutonomousSystemNumber"            , AutonomousSystemNumber
+            , "CrossTenantAccessType"             , CrossTenantAccessType
+            , "UserDisplayName"                   , UserDisplayName
+        )
+        , Pivots = bag_pack(
+            "Ip", bag_pack(
+            "Abuse IP Database", strcat('https://www.abuseipdb.com/check/'     , DvcIpAddr)
+                , "Virus Total"    , strcat('https://virustotal.com/gui/search/'   , DvcIpAddr)
+                , "Threat Book"    , strcat('https://www.threatbook.io/ip/'        , DvcIpAddr)
+                , "Ip Location"    , strcat('https://www.iplocation.net/ip-lookup/', DvcIpAddr)
+                , "Spur"           , strcat('https://spur.us/context/'             , DvcIpAddr)
+                , "Azure Lookup"   , strcat('https://www.azurespeed.com/api/ipAddress?ipOrDomain=', DvcIpAddr)
+            ),
+            "User History", bag_pack(
+                "All", strcat("vimAuthenticationAADNonInteractiveUserSignInLogs(starttime=ago(", pivot_lookback ,"d), user_id='", TargetUserId ,"')")
+                , "IP", strcat("vimAuthenticationAADNonInteractiveUserSignInLogs(starttime=ago(", pivot_lookback ,"d), user_id='", TargetUserId ,"', ip='", DvcIpAddr , "')")
+                , "OS", iff(isnotempty(DvcOs)
+                    , strcat("vimAuthenticationAADNonInteractiveUserSignInLogs(starttime=ago(", pivot_lookback ,"d), user_id='", TargetUserId ,"', dvc_os='", DvcOs,"')")
+                    , "-"
+                )
+                , "Device", iff(isnotempty(DvcHostname)
+                    , strcat("vimAuthenticationAADNonInteractiveUserSignInLogs(starttime=ago(", pivot_lookback ,"d), user_id='", TargetUserId ,"', srchostname_has_any='", DvcHostname ,"')")
+                    , "-"
+                )
+                , "User Agent", iff(isnotempty(HttpUserAgent)
+                    , strcat("vimAuthenticationAADNonInteractiveUserSignInLogs(starttime=ago(", pivot_lookback ,"d), user_id='", TargetUserId ,"', useragent='", HttpUserAgent ,"')")
+                    , "-"
+                )
+                , "Application", strcat("vimAuthenticationAADNonInteractiveUserSignInLogs(starttime=ago(", pivot_lookback ,"d), user_id='", TargetUserId ,"', targetappname_has_any='", TargetAppName ,"')")
+            )
+        )
+    | project-away 
+        Authe*
+        , Risk*
+        , Resource*
+        , Conditional*
+        , Location*
+        , SourceSystem
+        , OperationName
+        , MfaDetail
+        , CrossTenantAccessType
+        , AutonomousSystemNumber
+        , TokenIssuerType
+        , UniqueTokenIdentifier
+        , ClientAppUsed
+        , SessionLifetimePolicies
+        , UserDisplayName
+        , DeviceDetail
+        , Status
+        , NetworkLocationDetails
+        , Category
+        , ResultSignature
+        , DurationMs
+        , Level
+        , IsInteractive
+        , CreatedDateTime
+        , Identity
+        , OriginalRequestId
+        , ProcessingTimeInMs
+    | project-reorder
+        TimeGenerated
+        , User
+        , EventResult
+        , EventResultDetails
+        , EventSeverity
+        , LogonMethod
+        , LogonTarget
+        , Pivots
+        , IpAddr
+        , SrcGeoCountry
+        , SrcGeoRegion
+        , Dvc
+        , SrcDeviceType
+        , DvcOs
+        , DvcTrustType
+        , DvcZone
+        , EventMessage
+        , LogonProtocol
+        , MfaAuthMethod
+        , MfaAuthDetail
+        , ActingAppName
+        , HttpUserAgent
+        , UserType
+        , UserId
+        , DvcDomain
+        , DvcFQDN
+        , DvcManaged
+        , DvcCompliant
+        , DvcId
+        , DvcIdType
+        , Event*
+        , Src*
+        , Target*
+        , Acting*
+        , *
+    | order by TimeGenerated
+};
+AADNISigninLogs(starttime, endtime, username_has_any, targetappname_has_any, srcipaddr_has_any_prefix, srchostname_has_any, eventtype_in, eventresultdetails_in, eventresult, user_type, user_id, dvc_id, dvc_os, dvc_type, ip, useragent, eventseverity, eventproduct, pivot_lookback, disabled)

@@ -1,0 +1,2 @@
+# Version 1.0.0
+- Initial release of Sentinel Blues version of the vimAuthenticationAADServicePrincipalSignInLogs parser. See the [readme](/AuthenticationEvent/Parsers/Source%20Specific/vimAuthenticationAADServicePrincipalSignInLogs/Readme.md) for further information. The readme file was developed based on version 1.0.0 of this parser.

@@ -1,0 +1,65 @@
+let AuthenticationParser=(
+    starttime:datetime                  = datetime(null)
+    , endtime:datetime                  = datetime(null)
+    , username_has_any:dynamic          = dynamic([])
+    , targetappname_has_any:dynamic     = dynamic([])
+    , srcipaddr_has_any_prefix:dynamic  = dynamic([])
+    , srchostname_has_any:dynamic       = dynamic([])
+    , eventtype_in:dynamic              = dynamic([])
+    , eventresultdetails_in:dynamic     = dynamic([])
+    , eventresult:string                = "*"
+    , user_type:dynamic                 = dynamic([])
+    , user_id:dynamic                   = dynamic([])
+    , dvc_id:dynamic                    = dynamic([])
+    , dvc_os:dynamic                    = dynamic([])
+    , dvc_type:dynamic                  = dynamic([])
+    , ip:dynamic                        = dynamic([])
+    , useragent:dynamic                 = dynamic([])
+    , eventseverity:dynamic             = dynamic([])
+    , eventproduct:dynamic              = dynamic([])
+    , pivot_lookback:string             = "30"
+    , disabled:bool                     = false
+) {
+    union isfuzzy=true
+    vimAuthenticationEmpty
+        , vimAuthenticationAADManagedIdentitySignInLogs   (starttime, endtime, username_has_any, targetappname_has_any, srcipaddr_has_any_prefix, srchostname_has_any, eventtype_in, eventresultdetails_in, eventresult, user_type, user_id, dvc_id, dvc_os, dvc_type, ip, useragent, eventseverity, eventproduct, pivot_lookback, disabled)
+        , vimAuthenticationAADNonInteractiveUserSignInLogs(starttime, endtime, username_has_any, targetappname_has_any, srcipaddr_has_any_prefix, srchostname_has_any, eventtype_in, eventresultdetails_in, eventresult, user_type, user_id, dvc_id, dvc_os, dvc_type, ip, useragent, eventseverity, eventproduct, pivot_lookback, disabled)
+        , vimAuthenticationAADServicePrincipalSignInLogs  (starttime, endtime, username_has_any, targetappname_has_any, srcipaddr_has_any_prefix, srchostname_has_any, eventtype_in, eventresultdetails_in, eventresult, user_type, user_id, dvc_id, dvc_os, dvc_type, ip, useragent, eventseverity, eventproduct, pivot_lookback, disabled)
+        , vimAuthenticationSigninLogs                     (starttime, endtime, username_has_any, targetappname_has_any, srcipaddr_has_any_prefix, srchostname_has_any, eventtype_in, eventresultdetails_in, eventresult, user_type, user_id, dvc_id, dvc_os, dvc_type, ip, useragent, eventseverity, eventproduct, pivot_lookback, disabled)
+    | project-reorder 
+        TimeGenerated
+        , User*
+        , EventProduct
+        , EventType
+        , EventSubType
+        , EventSeverity
+        , EventResult
+        , EventResultDetails
+        , EventMessage
+        , Pivots
+        , LogonTarget
+        , LogonMethod
+        , LogonProtocol
+        , SrcIpAddr
+        , SrcGeoCountry
+        , SrcGeoRegion
+        , SrcGeoCity
+        , Dvc
+        , DvcOs
+        , SrcDeviceType
+        , DvcId
+        , DvcTrustType
+        , DvcCompliant
+        , DvcManaged
+        , DvcZone
+        , HttpUserAgent
+        , ActingAppName
+        , ActingAppId
+        , Event*
+        , Target*
+        , Src*
+        , Dvc*
+        , *
+    | order by TimeGenerated
+  };
+  AuthenticationParser(starttime, endtime, username_has_any, targetappname_has_any, srcipaddr_has_any_prefix, srchostname_has_any, eventtype_in, eventresultdetails_in, eventresult, user_type, user_id, dvc_id, dvc_os, dvc_type, ip, useragent, eventseverity, eventproduct, pivot_lookback, disabled)

@@ -1,0 +1,9 @@
+Schema,folder,Name,Version,MsRequiredVersion,Status,etag
+Authentication,source specific,vimAuthenticationAADManagedIdentitySignInLogs,0.1.0,0.1.2,beta,"""*"""
+Authentication,source specific,vimAuthenticationAADNonInteractiveUserSignInLogs,0.1.0,0.1.2,beta,"""*"""
+Authentication,source specific,vimAuthenticationAADServicePrincipalSignInLogs,0.1.0,0.1.2,beta,"""*"""
+Authentication,source specific,vimAuthenticationEmpty,0.1.0,0.1.2,beta,"""*"""
+Authentication,source specific,vimAuthenticationMicrosoftWindowsEvent,1.1.1,0.1.2,beta,"""*"""
+Authentication,source specific,vimAuthenticationSigninLogs,0.1.0,0.1.2,beta,"""*"""
+Authentication,source specific,vimAuthenticationWinlogbeatv7,0.1.0,0.1.2,beta,"""*"""
+Authentication,unifying,imAuthentication,0.1.0,0.1.2,beta,"""*"""

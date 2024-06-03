@@ -1,0 +1,129 @@
+Parser:
+  Title: AADResultTypes
+  Version: '1.0.0'
+  Type: Support
+  LastUpdated: May 10th, 2024
+  Source: Sentinel Blue
+Product:
+  Name: Microsoft Sentinel
+Normalization:
+  Schema: Authentication
+  Version: '0.1.3'
+References:
+- Title: Microsoft Entra authentication and authorization error codes
+  Link: https://learn.microsoft.com/en-us/entra/identity-platform/reference-error-codes
+- Title: Other Entra ID / Azure AD SignIn errors
+  Link: https://cloudbrothers.info/en/entra-id-azure-ad-signin-errors/
+Description: |
+  Translates authentication error codes to a human readable string describing the error.
+ParserName: "AADResultTypes"
+Etag: 0f2708c7-b5d4-4d7e-8117-8d63c7a9c258
+ParserQuery: |
+  let AADResultTypesLookup = datatable(
+      ResultType: string,
+      EventResultDetails: string,
+      EventType: string,
+      EventResult: string,
+      EventOriginalResultDetails: string,
+      EventSeverity: string
+  ) [
+      "0"      , "Successful authentication", "Logon" , "Success", "0 - Account Authentication Was Successful.", "Informational",
+      "53003"  , "Logon violates policy"    , "Logon" , "Failure", "53003 - Blocked By Conditional Access", "Low",
+      "50034"  , "No such user"             , "Logon" , "Failure", "50034 - User Account Not Found", "Low",
+      "50059"  , "No such user"             , "Logon" , "Failure", "50059 - Missing Tenant Realm And No User Information Provided", "Low",
+      "50053"  , "User locked"              , "Logon" , "Failure", "50053 - Ids Locked or IP address with malicious activity", "Low",
+      "50055"  , "Password expired"         , "Logon" , "Failure", "50055 - Invalid Password Expired Password", "Low",
+      "50056"  , "Incorrect password"       , "Logon" , "Failure", "50056 - Invalid or null password", "Low",
+      "50057"  , "User disabled"            , "Logon" , "Failure", "50057 - User Disabled", "Low",
+      "50058"  , "Logon violates policy"    , "Logon" , "Failure", "50058 - User Information Not Provided", "Low",
+      "50011"  , "Logon violates policy"    , "Logon" , "Failure", "50011 - The redirect URI specified in the request does not match", "Low",
+      "50064"  , "No such user or password" , "Logon" , "Failure", "50064 - Credential Authentication Error", "Low",
+      "50076"  , "Logon violates policy"    , "Logon" , "Failure", "50076 - User Strong Auth Client AuthN Required", "Low",
+      "50079"  , "Logon violates policy"    , "Logon" , "Failure", "50079 - User Strong Auth Enrollment Required", "Low",
+      "50105"  , "Logon violates policy"    , "Logon" , "Failure", "50105 - Entitlement Grants Not Found", "Low",
+      "50126"  , "No such user or password" , "Logon" , "Failure", "50126 - Invalid User Name Or Password", "Low",
+      "53000"  , "Logon violates policy"    , "Logon" , "Failure", "53000 - Conditional Access policy requires a compliant device, and the device is not compliant. Have the user enroll their device with an approved MDM provider like Intune.", "Low",
+      "50132"  , "Password expired"         , "Logon" , "Failure", "50132 - Sso Artifact Invalid Or Expired", "Low",
+      "50133"  , "Password expired"         , "Logon" , "Failure", "50133 - Sso Artifact Revoked", "Low",
+      "50144"  , "Password expired"         , "Logon" , "Failure", "50144 - Invalid Password Expired On Prem Password", "Low",
+      "50173"  , "Session expired"          , "Logon" , "Failure", "50173 - Fresh Token Needed", "Low",
+      "80012"  , "Logon violates policy"    , "Logon" , "Failure", "80012 - On Premise Password Validation Account Logon InvalidHours", "Low",
+      "51004"  , "No such user"             , "Logon" , "Failure", "51004 - User Account Not In Directory", "Low",
+      "50072"  , "Logon violates policy"    , "Logon" , "Failure", "50072 - User Strong Auth Enrollment Required Interrupt", "Low",
+      "50005"  , "Logon violates policy"    , "Logon" , "Failure", "50005 - Device Policy Error", "Low",
+      "50020"  , "Logon violates policy"    , "Logon" , "Failure", "50020 - User Unauthorized", "Low",
+      "50074"  , "Logon violates policy"    , "Logon" , "Failure", "50074 - User Strong Auth Client AuthN Required Interrupt", "Low",
+      "70008"  , "Session expired"          , "Logon" , "Failure", "70008 - Expired Or RevokedGrant", "Low",
+      "70021"  , "No such user"             , "Logon" , "Failure", "70021 - No matching federated identity record found for presented assertion", "Low",
+      "700016" , "No such user"             , "Logon" , "Failure", "700016 - Unauthorized Client Does Not Match Request", "Low",
+      "500011" , "No such user"             , "Logon" , "Failure", "500011 - Invalid Resource Service Principal Not Found", "Low",
+      "700027" , "Incorrect key"            , "Logon" , "Failure", "700027 - The certificate with identifier used to sign the client assertion is not registered on application", "Low",
+      "100003" , "Other"                    , "Logon" , "Failure", "100003 - Other", "Low",
+      "700082" , "Session expired"          , "Logon" , "Failure", "700082 - Expired Or Revoked Grant Inactive Token", "Low",
+      "530034" , "Logon violates policy"    , "Logon" , "Failure", "530034 - Delegated Admin Blocked Due To Suspicious Activity", "Low",
+      "530032" , "Logon violates policy"    , "Logon" , "Failure", "530032 - Blocked By Conditional Access On Security Policy", "Low",
+      "50061"  , "Other"                    , "Logoff", "Failure", "50061 - Signout Invalid Request", "Low",
+      "50068"  , "Other"                    , "Logoff", "Failure", "50068 - Signout Initiator Not Participant", "Low",
+      "50078"  , "Logon violates policy"    , "Logon" , "Failure", "50078 - User Strong Auth Expired", "Low",
+      "90024"  , "Other"                    , "Logon" , "Failure", "90024 - RequestBudgetExceededError - A transient error has occurred", "Informational",
+      "90033"  , "Other"                    , "Logon" , "Failure", "90033 - A transient error has occurred", "Informational",
+      "500341" , "User disabled"            , "Logon" , "Failure", "500341 - The user account has been deleted from the directory", "Low",
+      "1002016", "Logon violates policy"    , "Logon" , "Failure", "1002016 - You are using TLS version 1.0, 1.1 and/or 3DES cipher", "Low",
+      "7000215", "Incorrect password"       , "Logon" , "Failure", "7000215 - Invalid client secret is provided", "Low",
+      "7000222", "Session expired"          , "Logon" , "Failure", "7000222 - The provided client secret keys are expired", "Low",
+      "50158"  , "Logon violates policy"    , "Logon" , "Failure", "50158 - External security challenge was not satisfied.", "Low",
+      "50097"  , "Logon violates policy"    , "Logon" , "Failure", "50097 - Device Authentication Required - DeviceId -DeviceAltSecId claims are null OR no device corresponding to the device identifier exists.", "Low",
+      "700084" , "Session expired"          , "Logon" , "Failure", "700084 - The refresh token was issued to a single page app (SPA), and therefore has a fixed, limited lifetime, which cannot be extended. It is now expired and a new sign in request must be sent by the SPA to the sign in page.", "Low",
+      "50127"  , "Logon violates policy"    , "Logon" , "Failure", "50127 - User needs to install a broker app to gain access to this content.", "Low",
+      "50089"  , "Session expired"          , "Logon" , "Failure", "50089 - The session has expired or is invalid due to sign-in frequency checks by conditional access.", "Low",
+      "500121" , "Logon violates policy"    , "Logon" , "Failure", "500121 - Authentication failed during strong authentication request.", "Low",
+      "50140"  , "Other"                    , "Logon" , "Failure", "50140 - This error occurred due to 'Keep me signed in' interrupt when the user was signing-in.", "Informational",
+      "500212" , "Logon violates policy"    , "Logon" , "Failure", "500212 - The user's administrator has set an outbound access policy that does not allow access to the resource tenant.", "Low",
+      "50199"  , "Logon violates policy"    , "Logon" , "Failure", "50199 - For security reasons, user confirmation is required for this request. Please repeat the request allowing user interaction.", "Low",
+      "16003"  , "No such user"             , "Logon" , "Failure", "16003 - The user account does not exist in the directory or the user hasn't been explicitly added to the tenant. To sign into this application, the account must be added to the directory.", "Low",
+      "70044"  , "Session expired"          , "Logon" , "Failure", "70044 - The session has expired or is invalid due to sign-in frequency checks by conditional access.", "Low",
+      "65001"  , "Logon violates policy"    , "Logon" , "Failure", "65001 - Application X doesn't have permission to access application Y or the permission has been revoked. Or The user or administrator has not consented to use the application with ID X. Send an interactive authorization request for this user and resource. Or The user or administrator has not consented to use the application with ID X. Send an authorization request to your tenant admin to act on behalf of the App : Y for Resource : Z.", "Low",
+      "530004" , "Logon violates policy"    , "Logon" , "Failure", "530004 - AcceptCompliantDevice setting isn't configured for this organization. The admin needs to configure this setting to allow external users access to protected resources.", "Low",
+      "70037"  , "Incorrect key"            , "Logon" , "Failure", "70037 - Incorrect challenge response provided. Remote auth session denied.", "Low",
+      "65004"  , "Other"                    , "Logon" , "Failure", "65004 - User declined to consent to access the app. Have the user retry the sign-in and consent to the app.", "Low",
+      "90095"  , "Logon violates policy"    , "Logon" , "Failure", "90095 - Admin consent is required for the permissions requested by this application. An admin consent request may be sent to the admin.", "Low",
+      "50017"  , "Other"                    , "Logon" , "Failure", "50017 - Certification validation failed, reasons for the following reasons: Cannot find issuing certificate in trusted certificates list, Unable to find expected CrlSegment, Cannot find issuing certificate in trusted certificates list, Delta CRL distribution point is configured without a corresponding CRL distribution point, Unable to retrieve valid CRL segments due to timeout issue, Unable to download CRL. Contact the tenant admin.", "Low",
+      "70043"  , "Session expired"          , "Logon" , "Failure", "70043 - The refresh token has expired or is invalid due to sign-in frequency checks by conditional access.", "Low",
+      "1003033", "Logon violates policy"    , "Logon" , "Failure", "1003033 - The remote NGC session was denied.", "Low",
+      "65002"  , "Other"                    , "Logon" , "Failure", "65002 - Consent between first party application and first party resource must be configured via preauthorization - applications owned and operated by Microsoft must get approval from the API owner before requesting tokens for that API.", "Low",
+      "530021" , "Logon violates policy"    , "Logon" , "Failure", "530021 - Application does not meet the conditional access approved app requirements.", "Low",
+      "501291" , "Logon violates policy"    , "Logon" , "Failure", "501291 - Client app is a Mam app, device is not registered and request is sent using a broker. Work place join needs to be done to register the device before the app can be accessed.", "Low",
+      "140000" , "Logon violates policy"    , "Logon" , "Failure", "140000 - Request nonce is expired.", "Low",
+      "54005"  , "Incorrect key"            , "Logon" , "Failure", "54005 - OAuth2 Authorization code was already redeemed, please retry with a new valid code or use an existing refresh token.", "Low",
+      "7000016", "Incorrect key"            , "Logon" , "Failure", "7000016 - Primary refresh token is not signed with session key.", "Low",
+      "500131" , "Other"                    , "Logon" , "Failure", "500131 - Assertion audience does not match the Client app presenting the assertion. The audience in the assertion was ‘{tokenAudience}’ and the expected audience is ‘{expectedAudience}’ or one of the Application Uris of this application with App ID ‘{appId}’({appName}). The downstream client must request a token for the expected audience (the application that made the OBO request) and this application should use that token as the assertion.", "Low",
+      "500133" , "Incorrect key"            , "Logon" , "Failure", "500133 - Assertion is not within its valid time range. Ensure that the access token is not expired before using it for user assertion, or request a new token.", "Low",
+      "65003"  , "Other"                    , "Logon" , "Failure", "65003 - Consent for first party token-to-self must be configured via preauthorization. If preauthorization has already been configured, update the request to use a URI identifier for the resource instead of ‘{resourceId}’ to work around this error.", "Low",
+      "26000"  , "Other"                    , "Logon" , "Failure", "26000 - The provided access grant requires interaction.", "Low",
+      "399218" , "Other"                    , "Logon" , "Failure", "399218 - For security reasons, user confirmation is required for this request. Please repeat the request allowing user interaction.", "Low",
+      "500113" , "Other"                    , "Logon" , "Failure", "500113 - No reply address is registered for the application.", "Low",
+      "500141" , "Other"                    , "Logon" , "Failure", "500141 - The user’s redemption is complete but the request was not initiated by the target application.", "Low",
+      "500571" , "User disabled"            , "Logon" , "Failure", "500571 - The guest user account is disabled.", "Low",
+      "50087"  , "Other"                    , "Logon" , "Failure", "50087 - A transient error has occurred during strong authentication. Please try again.", "Low",
+      "501481" , "Other"                    , "Logon" , "Failure", "501481 - The Code_Verifier does not match the code_challenge supplied in the authorization request.", "Low",
+      "50170"  , "Other"                    , "Logon" , "Failure", "50170 - The external controls mapping is missing.", "Low",
+      "50192"  , "Other"                    , "Logon" , "Failure", "50192 - Invalid request.", "Low",
+      "530022" , "Other"                    , "Logon" , "Failure", "530022 - Browser not supported.", "Low",
+      "530031" , "Logon violates policy"    , "Logon" , "Failure", "530031 - Access policy does not allow token issuance.", "Low",
+      "530033" , "Logon violates policy"    , "Logon" , "Failure", "530033 - Remote device flow blocked due to device based conditional access.", "Low",
+      "650051" , "Other"                    , "Logon" , "Failure", "650051 - Actual message content is runtime specific. Please see returned exception message for details.", "Low",
+      "650053" , "Other"                    , "Logon" , "Failure", "650053 - The application ‘{name}’ asked for scope ‘{scope}’ that doesn’t exist on the resource ‘{resource}’. Contact the app vendor.", "Low",
+      "700003" , "Other"                    , "Logon" , "Failure", "700003 - Device object was not found in the tenant ‘{tenantName}’ directory.", "Low",
+      "7000218", "Other"                    , "Logon" , "Failure", "7000218 - The request body must contain the following parameter: ‘client_assertion’ or ‘client_secret’.", "Low",
+      "700025" , "Other"                    , "Logon" , "Failure", "700025 - Client is public so neither ‘client_assertion’ nor ‘client_secret’ should be presented.", "Low",
+      "700051" , "Other"                    , "Logon" , "Failure", "700051 - response_type ’token’ is not enabled for the application.", "Low",
+      "70041"  , "Other"                    , "Logon" , "Failure", "70041 - Unable to complete OAuth2 IdP’s sign in. The ’nonce’ claim does not match the expected value.", "Low",
+      "76021"  , "Logon violates policy"    , "Logon" , "Failure", "76021 - The request sent by client is not signed while the application requires signed requests", "Low",
+      "76026"  , "Other"                    , "Logon" , "Failure", "76026 - The request has expired. Try to submit a new request", "Low",
+      "90094"  , "Other"                    , "Logon" , "Failure", "90094 - Admin consent is required for the permissions requested by this application.", "Low",
+      "900971" , "Other"                    , "Logon" , "Failure", "900971 - No Reply Address Provided", "Low",
+      "90098"  , "Other"                    , "Logon" , "Failure", "90098 - An unexpected approval request ID was provided.", "Low",
+      "90117"  , "Other"                    , "Logon" , "Failure", "90117 - Invalid request", "Low",
+      "90135"  , "Other"                    , "Logon" , "Failure", "90135 - The user decided not to continue the authentication. No remediation is required.", "Low"
+  ];
+  AADResultTypesLookup

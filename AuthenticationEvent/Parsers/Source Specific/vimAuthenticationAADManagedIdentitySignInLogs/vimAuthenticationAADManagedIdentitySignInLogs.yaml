@@ -1,0 +1,234 @@
+Parser:
+  Title: Authentication ASIM filtering parser for AAD managed identity sign-in logs
+  Version: '1.0.0'
+  Type: Source Specific
+  LastUpdated: May 10th, 2021
+  Source: Sentinel Blue
+Product:
+  Name: AAD
+Normalization:
+  Schema: Authentication
+  Version: '0.1.3'
+References:
+- Title: ASIM
+  Link: https:/aka.ms/AboutASI
+- Title: ASIM Authentication Schema
+  Link: https://aka.ms/ASimAuthenticationDocM
+- Title: ASIM Common Schema
+  Link: https://learn.microsoft.com/en-us/azure/sentinel/normalization-common-fields
+- Title: AADManagedIdentitySignInLogs Table Reference
+  Link: https://learn.microsoft.com/en-us/azure/azure-monitor/reference/tables/aadmanagedidentitysigninlogs
+Description: |
+  This ASIM parser supports filtering and normalizing Azure Active Directory Managed Identity sign in logs, stored in the AADManagedIdentitySignInLogs table, to the ASIM Authentication schema.
+ParserName: vimAuthenticationAADManagedIdentitySignInLogs
+Etag: f321be59-bc43-4f80-a095-93e20bc39b3f
+Dependencies:
+  - Type: Table
+    Name: AADManagedIdentitySignInLogs
+    Version: N/A
+    Source: Microsoft
+  - Type: Support Parser
+    Name: AADResultTypes
+    Version: 1.0.0
+    Source: Sentinel Blue
+ParserParams:
+  - Name: starttime
+    Type: datetime
+    Default: datetime(null)
+  - Name: endtime
+    Type: datetime
+    Default: datetime(null)
+  - Name: username_has_any
+    Type: dynamic
+    Default: dynamic([])
+  - Name: targetappname_has_any
+    Type: dynamic
+    Default: dynamic([])
+  - Name: srcipaddr_has_any_prefix
+    Type: dynamic
+    Default: dynamic([])
+  - Name: srchostname_has_any
+    Type: dynamic
+    Default: dynamic([])
+  - Name: eventtype_in
+    Type: dynamic
+    Default: dynamic([])
+  - Name: eventresultdetails_in
+    Type: dynamic
+    Default: dynamic([])
+  - Name: eventresult
+    Type: string
+    Default: '*'
+  - Name: user_id
+    Type: dynamic
+    Default: dynamic([])
+  - Name: user_type
+    Type: dynamic
+    Default: dynamic([])
+  - Name: dvc_id
+    Type: dynamic
+    Default: dynamic([])
+  - Name: dvc_type
+    Type: dynamic
+    Default: dynamic([])
+  - Name: dvc_os
+    Type: dynamic
+    Default: dynamic([])
+  - Name: ip
+    Type: dynamic
+    Default: dynamic([])
+  - Name: useragent
+    Type: dynamic
+    Default: dynamic([])
+  - Name: eventseverity
+    Type: dynamic
+    Default: dynamic([])
+  - Name: eventproduct
+    Type: dynamic
+    Default: dynamic([])
+  - Name: pivot_lookback
+    Type: string
+    Default: '30'
+  - Name: disabled
+    Type: bool
+    Default: false
+ParserQuery: |
+  let ManagedIdentitySigninLogs = (
+      starttime:datetime                  = datetime(null)
+      , endtime:datetime                  = datetime(null)
+      , username_has_any:dynamic          = dynamic([])
+      , targetappname_has_any:dynamic     = dynamic([])
+      , srcipaddr_has_any_prefix:dynamic  = dynamic([])
+      , srchostname_has_any:dynamic       = dynamic([])
+      , eventtype_in:dynamic              = dynamic([])
+      , eventresultdetails_in:dynamic     = dynamic([])
+      , eventresult:string                = "*"
+      , user_type:dynamic                 = dynamic([])
+      , user_id:dynamic                   = dynamic([])
+      , dvc_id:dynamic                    = dynamic([])
+      , dvc_os:dynamic                    = dynamic([])
+      , dvc_type:dynamic                  = dynamic([])
+      , ip:dynamic                        = dynamic([])
+      , useragent:dynamic                 = dynamic([])
+      , eventseverity:dynamic             = dynamic([])
+      , eventproduct:dynamic              = dynamic([])
+      , pivot_lookback:string             = "30d"
+      , disabled:bool                     = false
+  ) {
+      AADManagedIdentitySignInLogs
+      | where not(disabled)
+          and (isnull(starttime)                              or TimeGenerated >= starttime)
+          and (isnull(endtime)                                or TimeGenerated <= endtime)
+      | where ((array_length(username_has_any)         == 0)  or ServicePrincipalName has_any(username_has_any))
+          and ((array_length(targetappname_has_any)    == 0)  or ResourceDisplayName has_any(targetappname_has_any))
+          and ((array_length(srcipaddr_has_any_prefix) == 0)  or (has_any_ipv4_prefix(IPAddress, srcipaddr_has_any_prefix)))
+          and ((array_length(ip)                       == 0)  or IPAddress has_any(ip))
+          and ((array_length(user_id)                  == 0)  or ServicePrincipalId has_any(user_id))
+      | lookup AADResultTypes on ResultType
+      | extend
+          EventProduct     = "Entra ID"
+          , EventVendor    = "Microsoft"
+          , TargetUserType = "Application"
+      | where ((eventresult                       == "*") or EventResult has eventresult)
+          and ((array_length(eventtype_in)          == 0) or EventType has_any (eventtype_in))
+          and ((array_length(eventproduct)          == 0) or EventProduct has_any (eventproduct))
+          and ((array_length(eventseverity)         == 0) or EventSeverity has_any(eventseverity))
+          and ((array_length(eventresultdetails_in) == 0) or EventResultDetails has_any(eventresultdetails_in))
+          and ((array_length(user_type)             == 0) or TargetUserType has_any(user_type))
+          and (array_length(srchostname_has_any)    == 0)
+          and (array_length(dvc_id)                 == 0)
+          and (array_length(dvc_os)                 == 0)
+          and (array_length(dvc_type)               == 0)
+          and (array_length(useragent)              == 0) 
+      | extend
+          EventCount            = toint(1)
+          , EventSchema           = "Authentication"
+          , EventSchemaVersion    = "0.1.3"
+          , EventSubType          = "Service"
+          , TargetAppType         = "Resource"
+          , LogonMethod           = "Managed Identity"
+          , TargetUsernameType    = 'Simple'
+          , TargetUserIdType      = 'EntraID'
+          , EventStartTime        = TimeGenerated
+          , EventEndTime          = TimeGenerated
+          , Dvc                   = strcat(EventVendor, '/', EventProduct)
+          , EventOriginalSubType  = Type
+          , EventMessage          = EventOriginalResultDetails
+      | project-rename 
+          ActingAppId             = AppId
+          , TargetAppId           = ResourceIdentity
+          , TargetAppName         = ResourceDisplayName
+          , TargetUsername        = ServicePrincipalName
+          , TargetUserId          = ServicePrincipalId
+          , EventOriginalUid      = Id
+          , TargetSessionId       = CorrelationId
+          , SrcIpAddr             = IPAddress
+          , EventUid              = _ItemId
+          , EventProductVersion   = OperationVersion
+          , EventOriginalType     = ResultType
+      | extend 
+          User                    = TargetUsername
+          , UserId                = TargetUserId
+          , UserType              = TargetUserType
+          , LogonTarget           = TargetAppName
+          , EventStartTime        = TimeGenerated
+          , EventEndTime          = TimeGenerated
+          , Dst                   = TargetAppName
+          , Src                   = SrcIpAddr
+          , IpAddr                = SrcIpAddr
+          , DvcIpAddr             = SrcIpAddr
+          , DvcHostname           = Dvc
+          , SrcHostname           = Dvc
+          , TargetSimpleUsername  = TargetUsername
+          , TargetUserAadId       = TargetUserId
+          , Application           = TargetAppName
+          , Pivots                = bag_pack(
+              "User History", bag_pack(
+                  "All", strcat("vimAuthenticationAADManagedIdentitySignInLogs(starttime=ago(", pivot_lookback ,"d), endtime=now(), user_id='", TargetUserId ,"')")
+                  , "Application", strcat("vimAuthenticationAADManagedIdentitySignInLogs(starttime=ago(", pivot_lookback ,"d), endtime=now(), user_id='", TargetUserId ,"', targetappname_has_any='", TargetAppName ,"')")
+              )
+          )
+          , AdditionalDetails = bag_pack(
+                "UniqueTokenIdentifier"          , UniqueTokenIdentifier
+              , "LocationDetails"                , LocationDetails
+              , "ConditionalAccessPolicies"      , ConditionalAccessPolicies
+              , "ConditionalAccessStatus"        , ConditionalAccessStatus
+              , "AuthenticationProcessingDetails", AuthenticationProcessingDetails
+          )
+      | project-away
+          OperationName
+          , Category
+          , Result*
+          , ServicePrincipal*
+          , SourceSystem
+          , DurationMs
+          , Resource*
+          , Location*
+          , UniqueTokenIdentifier
+          , FederatedCredentialId
+          , Conditional*
+          , Authentication*
+          , Identity
+          , Level
+          , TenantId
+      | project-reorder 
+          TimeGenerated
+          , User
+          , UserId
+          , UserType
+          , EventType
+          , EventResultDetails
+          , EventResult
+          , EventMessage
+          , LogonMethod
+          , LogonTarget
+          , TargetUserId
+          , TargetAppId
+          , ActingAppId
+          , Pivots
+          , Event*
+          , Target*
+          , *
+      | order by TimeGenerated
+  };
+  ManagedIdentitySigninLogs(starttime, endtime, username_has_any, targetappname_has_any, srcipaddr_has_any_prefix, srchostname_has_any, eventtype_in, eventresultdetails_in, eventresult, user_type, user_id, dvc_id, dvc_os, dvc_type, ip, useragent, eventseverity, eventproduct, pivot_lookback, disabled)
